@@ -11,6 +11,10 @@ from nerf.gui import NeRFGUI
 
 if __name__ == '__main__':
 
+    # python main.py --text "a hamburger" --workspace trial -O
+
+    # %run main.py -O --text {Prompt_text} --workspace {Workspace} --iters {Training_iters} --lr {Learning_rate} --w {Training_nerf_resolution} --h {Training_nerf_resolution} --seed {Seed} --lambda_entropy {Lambda_entropy} --ckpt {Checkpoint} --save_mesh
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--text', default=None, help="text prompt")
     parser.add_argument('-O', action='store_true', help="equals --fp16 --cuda_ray --dir_text")

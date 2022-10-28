@@ -111,21 +111,46 @@ model = None
 
 # define UI
 
-with gr.Blocks(css=".gradio-container {max-width: 512px; margin: auto;}") as demo:
+def load_mesh(mesh_file_name):
+    return mesh_file_name
+
+mesh_render = gr.Interface(
+        fn=load_mesh,
+        inputs=gr.Model3D(),
+        outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
+        examples=['/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'],
+        cache_examples=True,
+    )
+
+# with gr.Tab("mesh"):
+#     gr.Interface(
+#         fn=load_mesh,
+#         inputs=gr.Model3D(),
+#         outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
+#         # examples=[mesh_res[-1], ],
+#         cache_examples=True,
+#     )
+
+with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as demo:
 
     # title
-    gr.Markdown('[Stable-DreamFusion](https://github.com/ashawkey/stable-dreamfusion) Text-to-3D Example')
+    # gr.Markdown('[Stable-DreamFusion](https://github.com/ashawkey/stable-dreamfusion) Text-to-3D Example')
+    gr.Markdown(' 【文字转3D模型】 @Author : 丁超凡 （内测版本 并发数只能为一！）')
 
     # inputs
-    prompt = gr.Textbox(label="Prompt", max_lines=1, value="a DSLR photo of a koi fish")
-    iters = gr.Slider(label="Iters", minimum=1000, maximum=20000, value=5000, step=100)
-    seed = gr.Slider(label="Seed", minimum=0, maximum=2147483647, step=1, randomize=True)
-    button = gr.Button('Generate')
+    prompt = gr.Textbox(label="输入3D模型描述，目前仅支持英文", max_lines=1, value="a DSLR photo of a delicious hamburger")
+    iters = gr.Slider(label="迭代次数", minimum=100, maximum=20000, value=5000, step=100)
+    seed = gr.Slider(label="随机种子", minimum=0, maximum=2147483647, step=1, randomize=True)
+    button = gr.Button('点击生成！')
+    # mesh_button = gr.Button('Generate mesh')
 
     # outputs
-    image = gr.Image(label="image", visible=True)
-    video = gr.Video(label="video", visible=False)
-    logs = gr.Textbox(label="logging")
+    image = gr.Image(label="实时帧展示", visible=True)
+    video = gr.Video(label="最终渲染视频", visible=False)
+    logs = gr.Textbox(label="训练log")
+    # mesh = gr.Model3D(label="3D mesh", visible=True)
+
+    mesh_res = []
 
     # gradio main func
     def submit(text, iters, seed):
@@ -196,32 +221,55 @@ with gr.Blocks(css=".gradio-container {max-width: 512px; margin: auto;}") as dem
                 image: gr.update(value=pred, visible=True),
                 video: gr.update(visible=False),
                 logs: f"training iters: {epoch * STEPS} / {iters}, lr: {trainer.optimizer.param_groups[0]['lr']:.6f}",
+                # mesh: gr.update(visible=True)
             }
-        
 
         # test
         trainer.test(test_loader)
 
-        results = glob.glob(os.path.join(opt.workspace, 'results', '*rgb*.mp4'))
+        results = glob.glob(os.path.join(opt.workspace, 'results', '*_rgb.mp4'))
         assert results is not None, "cannot retrieve results!"
         results.sort(key=lambda x: os.path.getmtime(x)) # sort by mtime
         
         end_t = time.time()
-        
+
         yield {
             image: gr.update(visible=False),
             video: gr.update(value=results[-1], visible=True),
-            logs: f"Generation Finished in {(end_t - start_t)/ 60:.4f} minutes!",
+            logs: f"训练结束！共耗时 {(end_t - start_t)/ 60:.4f} 分钟! 请继续等待至渲染视频加载完毕 ",
+            # mesh: gr.update(value=mesh_result[-1], visible=True)
         }
 
-    
+        # trainer.save_mesh(resolution=256)  # Johnson
+        # # global mesh_result
+        # mesh_result = glob.glob(os.path.join(opt.workspace, 'mesh', 'mesh.obj'))
+        # print('mesh_result ', mesh_result)
+
     button.click(
         submit, 
-        [prompt, iters, seed],
-        [image, video, logs]
+        inputs=[prompt, iters, seed],
+        outputs=[image, video, logs]
     )
+
+    mesh_render.render()
+
+    # with gr.Row():
+    #     def load_mesh(mesh_file_name):
+    #         return mesh_file_name
+    #
+    #     mesh_render = gr.Interface(
+    #         fn=load_mesh,
+    #         inputs=gr.Model3D(),
+    #         outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
+    #         examples=[mesh_res[-1], ],
+    #         cache_examples=True,
+    #     )
+
+
+
+
 
 # concurrency_count: only allow ONE running progress, else GPU will OOM.
 demo.queue(concurrency_count=1)
 
-demo.launch()
+demo.launch(share=True)
