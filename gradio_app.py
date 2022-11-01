@@ -111,23 +111,17 @@ model = None
 
 # define UI
 
-def load_mesh(mesh_file_name):
-    return mesh_file_name
-
-mesh_render = gr.Interface(
-        fn=load_mesh,
-        inputs=gr.Model3D(),
-        outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
-        examples=['/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'],
-        cache_examples=True,
-    )
-
-# with gr.Tab("mesh"):
-#     gr.Interface(
+# def load_mesh(mesh_file_name):
+#     return [mesh_file_name, mesh_file_name]
+#
+# mesh_render = gr.Interface(
 #         fn=load_mesh,
 #         inputs=gr.Model3D(),
-#         outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
-#         # examples=[mesh_res[-1], ],
+#         outputs=[
+#             gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
+#             gr.File(label="Download 3D Model")
+#         ],
+#         examples=['/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'], #  [os.path.join(os.path.dirname(__file__), "files/Bunny.obj")],
 #         cache_examples=True,
 #     )
 
@@ -138,8 +132,8 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
     gr.Markdown(' 【文字转3D模型】 @Author : 丁超凡 （内测版本 并发数只能为一！）')
 
     # inputs
-    prompt = gr.Textbox(label="输入3D模型描述，目前仅支持英文", max_lines=1, value="a DSLR photo of a delicious hamburger")
-    iters = gr.Slider(label="迭代次数", minimum=100, maximum=20000, value=5000, step=100)
+    prompt = gr.Textbox(label="输入希望生成的3D模型描述，目前仅支持英文", max_lines=1, value="a DSLR photo of a delicious hamburger")
+    iters = gr.Slider(label="迭代次数，默认15000次", minimum=100, maximum=20000, value=15000, step=100)
     seed = gr.Slider(label="随机种子", minimum=0, maximum=2147483647, step=1, randomize=True)
     button = gr.Button('点击生成！')
     # mesh_button = gr.Button('Generate mesh')
@@ -148,9 +142,9 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
     image = gr.Image(label="实时帧展示", visible=True)
     video = gr.Video(label="最终渲染视频", visible=False)
     logs = gr.Textbox(label="训练log")
-    # mesh = gr.Model3D(label="3D mesh", visible=True)
+    mesh = gr.Model3D(label="3D mesh模型展示", visible=True)
+    file = gr.File(label="mesh文件下载", visible=False)
 
-    mesh_res = []
 
     # gradio main func
     def submit(text, iters, seed):
@@ -221,50 +215,46 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
                 image: gr.update(value=pred, visible=True),
                 video: gr.update(visible=False),
                 logs: f"training iters: {epoch * STEPS} / {iters}, lr: {trainer.optimizer.param_groups[0]['lr']:.6f}",
-                # mesh: gr.update(visible=True)
+                mesh : gr.update(visible=True),
+                file : gr.update(visible=False)
             }
 
         # test
-        trainer.test(test_loader)
+        trainer.test(test_loader,write_video=False)
 
-        results = glob.glob(os.path.join(opt.workspace, 'results', '*_rgb.mp4'))
-        assert results is not None, "cannot retrieve results!"
-        results.sort(key=lambda x: os.path.getmtime(x)) # sort by mtime
-        
+        trainer.save_mesh(resolution=128)  # Johnson
+        mesh_result_wen = glob.glob(os.path.join(opt.workspace, 'mesh', 'mesh.obj'))
+        print('mesh_result_wen=', mesh_result_wen)
+        # mesh_result = os.path.join(opt.workspace, 'mesh', 'mesh.obj')
+        mesh_result = '/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'
+        print('mesh_result ', mesh_result)
+
+        # results = glob.glob(os.path.join(opt.workspace, 'results', '*_rgb.mp4'))
+        # assert results is not None, "cannot retrieve results!"
+        # results.sort(key=lambda x: os.path.getmtime(x)) # sort by mtime
+
+
         end_t = time.time()
+
+        print('done ----------------')
 
         yield {
             image: gr.update(visible=False),
-            video: gr.update(value=results[-1], visible=True),
-            logs: f"训练结束！共耗时 {(end_t - start_t)/ 60:.4f} 分钟! 请继续等待至渲染视频加载完毕 ",
-            # mesh: gr.update(value=mesh_result[-1], visible=True)
+            # video: gr.update(value=results[-1], visible=True),
+            video: gr.update(visible=False),
+            logs: f"训练结束！共耗时 {(end_t - start_t)/ 60:.4f} 分钟! 请继续等待下方mesh模型展示加载完成，或直接下载文件 ",
+            mesh: gr.update(value=mesh_result, visible=True),
+            file: gr.update(value=mesh_result, visible=True)
         }
 
-        # trainer.save_mesh(resolution=256)  # Johnson
-        # # global mesh_result
-        # mesh_result = glob.glob(os.path.join(opt.workspace, 'mesh', 'mesh.obj'))
-        # print('mesh_result ', mesh_result)
 
     button.click(
         submit, 
         inputs=[prompt, iters, seed],
-        outputs=[image, video, logs]
+        outputs=[image, video, logs, mesh, file]
     )
 
-    mesh_render.render()
-
-    # with gr.Row():
-    #     def load_mesh(mesh_file_name):
-    #         return mesh_file_name
-    #
-    #     mesh_render = gr.Interface(
-    #         fn=load_mesh,
-    #         inputs=gr.Model3D(),
-    #         outputs=gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
-    #         examples=[mesh_res[-1], ],
-    #         cache_examples=True,
-    #     )
-
+    # mesh_render.render()
 
 
 
@@ -272,4 +262,4 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
 # concurrency_count: only allow ONE running progress, else GPU will OOM.
 demo.queue(concurrency_count=1)
 
-demo.launch(share=True)
+demo.launch(debug=True, share=True, show_error=True)
