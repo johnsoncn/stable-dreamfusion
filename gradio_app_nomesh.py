@@ -109,29 +109,25 @@ print(f'[INFO] everything loaded!')
 trainer = None
 model = None
 
-# define UI
 
-# def load_mesh(mesh_file_name):
-#     return [mesh_file_name, mesh_file_name]
-#
-# mesh_render = gr.Interface(
-#         fn=load_mesh,
-#         inputs=gr.Model3D(),
-#         outputs=[
-#             gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
-#             gr.File(label="Download 3D Model")
-#         ],
-#         examples=['/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'], #  [os.path.join(os.path.dirname(__file__), "files/Bunny.obj")],
-#         cache_examples=True,
-#     )
+def load_mesh(mesh_file_name):
+    return [mesh_file_name, mesh_file_name]
+
+mesh_render = gr.Interface(
+        fn=load_mesh,
+        inputs=gr.Model3D(),
+        outputs=[
+            gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label="3D Model"),
+            gr.File(label="Download 3D Model")
+        ],
+        examples=['/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'], #  [os.path.join(os.path.dirname(__file__), "files/Bunny.obj")],
+        cache_examples=True,
+    )
 
 with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as demo:
 
     # title
-    # gr.Markdown('[Stable-DreamFusion](https://github.com/ashawkey/stable-dreamfusion) Text-to-3D Example')
-    gr.Markdown(' 【文字转3D模型】 @Author : 丁超凡 （内测版本 并发数只能为一！）')
-
-
+    gr.Markdown(' 【文字转3D模型】 @Author : QA中台服务组 -丁超凡 （内测版本 并发数只能为一！）')
 
     # inputs
     prompt = gr.Textbox(label="输入希望生成的3D模型描述，目前仅支持英文", max_lines=1, value="Sydney opera house, aerial view")
@@ -151,15 +147,11 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
     iters = gr.Slider(label="迭代次数，默认15000次", minimum=100, maximum=20000, value=15000, step=100)
     seed = gr.Slider(label="随机种子", minimum=0, maximum=2147483647, step=1, randomize=True)
     button = gr.Button('点击生成！')
-    # mesh_button = gr.Button('Generate mesh')
 
     # outputs
     image = gr.Image(label="实时帧展示", visible=True)
     video = gr.Video(label="最终渲染视频", visible=False)
     logs = gr.Textbox(label="训练log")
-    mesh = gr.Model3D(label="3D mesh模型展示", visible=True)
-    file = gr.File(label="mesh文件下载", visible=False)
-
 
     # gradio main func
     def submit(text, iters, seed):
@@ -230,19 +222,11 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
                 image: gr.update(value=pred, visible=True),
                 video: gr.update(visible=False),
                 logs: f"training iters: {epoch * STEPS} / {iters}, lr: {trainer.optimizer.param_groups[0]['lr']:.6f}",
-                mesh : gr.update(visible=True),
-                file : gr.update(visible=False)
             }
 
         # test
         trainer.test(test_loader,write_video=True)
 
-        trainer.save_mesh(resolution=128)  # Johnson
-        mesh_result_wen = glob.glob(os.path.join(opt.workspace, 'mesh', 'mesh.obj'))
-        print('mesh_result_wen=', mesh_result_wen)
-        # mesh_result = os.path.join(opt.workspace, 'mesh', 'mesh.obj')
-        mesh_result = '/home/dingchaofan/stable-dreamfusion/trial_gradio/mesh/mesh.obj'
-        print('mesh_result ', mesh_result)
 
         results = glob.glob(os.path.join(opt.workspace, 'results', '*_rgb.mp4'))
         assert results is not None, "cannot retrieve results!"
@@ -255,21 +239,18 @@ with gr.Blocks(css=".gradio-container {max-width: 1024px; margin: auto;}") as de
 
         yield {
             image: gr.update(visible=False),
-            # video: gr.update(value=results[-1], visible=True),
-            video: gr.update(visible=True),
-            logs: f"训练结束！共耗时 {(end_t - start_t)/ 60:.4f} 分钟! 请继续等待下方mesh模型展示加载完成（可能较慢），或直接下载文件！ ",
-            mesh: gr.update(value=mesh_result, visible=True),
-            file: gr.update(value=mesh_result, visible=True)
+            video: gr.update(value=results[-1], visible=True),
+            logs: f"训练结束！共耗时 {(end_t - start_t)/ 60:.4f} 分钟! 上方渲染视频合成预计需要30秒以内，请等待！（mesh合成可能导致服务崩溃，暂时关闭，修复中）"
         }
 
 
     button.click(
         submit, 
         inputs=[prompt, iters, seed],
-        outputs=[image, video, logs, mesh, file]
+        outputs=[image, video, logs]
     )
 
-    # mesh_render.render()
+    mesh_render.render()
 
 
 
