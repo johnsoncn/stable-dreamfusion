@@ -13,9 +13,11 @@ rich
 dearpygui
 scipy
 huggingface_hub
-diffusers
+diffusers >= 0.9.0 # for stable-diffusion 2.0
 transformers
 xatlas
 scikit-learn
 imageio
 imageio-ffmpeg
+accelerate
+tensorboard

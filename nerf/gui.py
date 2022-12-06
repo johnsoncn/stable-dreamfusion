@@ -175,6 +175,9 @@ class NeRFGUI:
             # text prompt
             if self.opt.text is not None:
                 dpg.add_text("text: " + self.opt.text, tag="_log_prompt_text")
+            
+            if self.opt.negative != '':
+                dpg.add_text("negative text: " + self.opt.negative, tag="_log_prompt_negative_text")
 
             # button theme
             with dpg.theme() as theme_button:
@@ -248,7 +251,7 @@ class NeRFGUI:
                         dpg.add_text("Marching Cubes: ")
 
                         def callback_mesh(sender, app_data):
-                            self.trainer.save_mesh(resolution=256, threshold=10)
+                            self.trainer.save_mesh(resolution=256)
                             dpg.set_value("_log_mesh", "saved " + f'{self.trainer.name}_{self.trainer.epoch}.ply')
                             self.trainer.epoch += 1 # use epoch to indicate different calls.
 

@@ -296,12 +296,26 @@ class Trainer(object):
             return
 
         if not self.opt.dir_text:
-            self.text_z = self.guidance.get_text_embeds([self.opt.text])
+            self.text_z = self.guidance.get_text_embeds([self.opt.text], [self.opt.negative])
         else:
             self.text_z = []
             for d in ['front', 'side', 'back', 'side', 'overhead', 'bottom']:
+                # construct dir-encoded text
                 text = f"{self.opt.text}, {d} view"
-                text_z = self.guidance.get_text_embeds([text])
+
+                negative_text = f"{self.opt.negative}"
+
+                # explicit negative dir-encoded text
+                if self.opt.suppress_face:
+                    if negative_text != '': negative_text += ', '
+
+                    if d == 'back': negative_text += "face"
+                    # elif d == 'front': negative_text += ""
+                    elif d == 'side': negative_text += "face"
+                    elif d == 'overhead': negative_text += "face"
+                    elif d == 'bottom': negative_text += "face"
+                
+                text_z = self.guidance.get_text_embeds([text], [negative_text])
                 self.text_z.append(text_z)
 
     def __del__(self):
@@ -337,9 +351,9 @@ class Trainer(object):
             if rand > 0.8: 
                 shading = 'albedo'
                 ambient_ratio = 1.0
-            # elif rand > 0.4: 
-            #     shading = 'textureless'
-            #     ambient_ratio = 0.1
+            elif rand > 0.4: 
+                shading = 'textureless'
+                ambient_ratio = 0.1
             else: 
                 shading = 'lambertian'
                 ambient_ratio = 0.1
@@ -382,6 +396,10 @@ class Trainer(object):
         if self.opt.lambda_orient > 0 and 'loss_orient' in outputs:
             loss_orient = outputs['loss_orient']
             loss = loss + self.opt.lambda_orient * loss_orient
+
+        if self.opt.lambda_smooth > 0 and 'loss_smooth' in outputs:
+            loss_smooth = outputs['loss_smooth']
+            loss = loss + self.opt.lambda_smooth * loss_smooth
             
         return pred_rgb, pred_ws, loss
 
@@ -634,7 +652,7 @@ class Trainer(object):
         with torch.no_grad():
             with torch.cuda.amp.autocast(enabled=self.fp16):
                 # here spp is used as perturb random seed!
-                preds, preds_depth = self.test_step(data, bg_color=bg_color, perturb=spp)
+                preds, preds_depth = self.test_step(data, bg_color=bg_color, perturb=False if spp == 1 else spp)
 
         if self.ema is not None:
             self.ema.restore()
@@ -865,9 +883,10 @@ class Trainer(object):
 
         else:    
             if len(self.stats["results"]) > 0:
-                if self.stats["best_result"] is None or self.stats["results"][-1] < self.stats["best_result"]:
-                    self.log(f"[INFO] New best result: {self.stats['best_result']} --> {self.stats['results'][-1]}")
-                    self.stats["best_result"] = self.stats["results"][-1]
+                # always save best since loss cannot reflect performance.
+                if True:
+                    # self.log(f"[INFO] New best result: {self.stats['best_result']} --> {self.stats['results'][-1]}")
+                    # self.stats["best_result"] = self.stats["results"][-1]
 
                     # save ema results 
                     if self.ema is not None:
